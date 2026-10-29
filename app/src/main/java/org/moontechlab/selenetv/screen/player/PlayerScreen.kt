@@ -89,7 +89,7 @@ private const val BACK_EXIT_WINDOW_MS = 2_000L
  */
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
-fun PlayerScreen(launch: PlayerLaunch, onExit: () -> Unit, modifier: Modifier = Modifier) {
+fun PlayerScreen(launch: PlayerLaunch, onExit: () -> Unit, modifier: Modifier = Modifier, remote: org.moontechlab.selenetv.remote.RemoteLaunch? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -97,7 +97,13 @@ fun PlayerScreen(launch: PlayerLaunch, onExit: () -> Unit, modifier: Modifier = 
     // MainActivity.dispatchKeyEvent，故 5021ed4 的 Activity 级 BACK 自管对这里失效。BackHandler 绑定的是
     // Dialog 自身的 onBackPressedDispatcher，下方 root 直接拦截 BACK 手动驱动它（见 onPreviewKeyEvent 注释）。
     val backDispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-    val controller: VideoPlayer = remember { PlayerFactory.create(context) }
+    val controller: VideoPlayer = remember { PlayerFactory.create(context, remoteMedia = remote?.request?.media) }
+    org.moontechlab.selenetv.remote.BindRemotePlayer(remote, controller, onExit)
+    LaunchedEffect(controller) {
+        if (remote == null) org.moontechlab.selenetv.remote.RemoteReceiver.playbackActive.collect { active ->
+            if (active) { controller.pause(); onExit() }
+        }
+    }
     val reporter = remember { PlayProgressReporter() }
 
     // 播放页处于独立 Dialog 窗口（见 DetailScreen 用 Dialog 隔离焦点域）。Compose Dialog 在
@@ -131,7 +137,7 @@ fun PlayerScreen(launch: PlayerLaunch, onExit: () -> Unit, modifier: Modifier = 
     var speedResults by remember { mutableStateOf<Map<String, org.moontechlab.selenetv.model.SourceSpeed>>(emptyMap()) }
     var speedTestJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     // 播放倍速 + 唤出弹窗状态。speed 变化 → 推到 controller（ExoPlayer/MPV 各自原生 API）。
-    var playbackSpeed by remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    var playbackSpeed by remember { androidx.compose.runtime.mutableFloatStateOf(remote?.request?.media?.rate?.toFloat() ?: 1f) }
     var speedPopupOpen by remember { mutableStateOf(false) }
     LaunchedEffect(playbackSpeed) { controller.speed = playbackSpeed }
 
@@ -277,7 +283,7 @@ fun PlayerScreen(launch: PlayerLaunch, onExit: () -> Unit, modifier: Modifier = 
         val src = launch.sources.firstOrNull { sourceKey(it) == currentSourceKey } ?: launch.selectedSource
         val raw = src?.episodes?.getOrNull(index) ?: return
         scope.launch {
-            val proxy = org.moontechlab.selenetv.service.AppDataService.getM3u8ProxyUrl()
+            val proxy = if (remote == null) org.moontechlab.selenetv.service.AppDataService.getM3u8ProxyUrl() else ""
             controller.load(PlayProgress.buildPlayUrl(raw, proxy), startMs)
         }
     }

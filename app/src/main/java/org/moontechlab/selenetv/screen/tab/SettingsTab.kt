@@ -105,6 +105,7 @@ fun SettingsTab(
     onShowLoginScreen: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    // Native phone trust is independent from the browser remote and login data.
     val coroutineScope = rememberCoroutineScope()
     val doubanCacheService = remember { DoubanCacheService.getInstance(context) }
 
@@ -340,6 +341,7 @@ fun SettingsTab(
 
                 // —— 遥控器 ——
                 SectionLabel("遥控器")
+                org.moontechlab.selenetv.remote.TrustedPhonesPanel()
                 SettingRow(
                     label = "调整遥控二维码 IP",
                     value = selectedIp.ifEmpty { "未知" },

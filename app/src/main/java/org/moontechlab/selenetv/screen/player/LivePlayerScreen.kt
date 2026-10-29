@@ -66,9 +66,15 @@ private val LiveGreen = Color(0xFF4CAF50)
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
-fun LivePlayerScreen(launch: LiveLaunch, onExit: () -> Unit, modifier: Modifier = Modifier) {
+fun LivePlayerScreen(launch: LiveLaunch, onExit: () -> Unit, modifier: Modifier = Modifier, remote: org.moontechlab.selenetv.remote.RemoteLaunch? = null) {
     val context = LocalContext.current
-    val controller: VideoPlayer = remember { PlayerFactory.create(context, launch.source.ua) }
+    val controller: VideoPlayer = remember { PlayerFactory.create(context, launch.source.ua, remote?.request?.media) }
+    org.moontechlab.selenetv.remote.BindRemotePlayer(remote, controller, onExit)
+    LaunchedEffect(controller) {
+        if (remote == null) org.moontechlab.selenetv.remote.RemoteReceiver.playbackActive.collect { active ->
+            if (active) { controller.pause(); onExit() }
+        }
+    }
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     var currentChannel by remember { mutableStateOf(launch.channel) }

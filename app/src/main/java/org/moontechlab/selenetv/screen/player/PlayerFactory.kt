@@ -19,14 +19,17 @@ fun resolveEffectivePlayerType(requested: PlayerType, sdkInt: Int): PlayerType =
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 object PlayerFactory {
-    fun create(context: Context, userAgent: String? = null): VideoPlayer {
+    fun create(context: Context, userAgent: String? = null, remoteMedia: org.moontechlab.selenetv.remote.RemoteMedia? = null): VideoPlayer {
         val decode = AppDataService.getDecodeModeSync()
         val type = resolveEffectivePlayerType(AppDataService.getPlayerTypeSync(), Build.VERSION.SDK_INT)
         fun exo(): VideoPlayer {
             val ds: DataSource.Factory =
-                if (userAgent != null) MediaHttp.dataSourceFactory(userAgent) else MediaHttp.dataSourceFactory
+                if (remoteMedia != null) MediaHttp.remoteDataSourceFactory(remoteMedia.url, remoteMedia.headers) else if (userAgent != null) MediaHttp.dataSourceFactory(userAgent) else MediaHttp.dataSourceFactory
             return PlayerController(context, ds, decode)
         }
+        // Media3's per-request interceptor can scope credentials across redirects
+        // and HLS segments. mpv cannot enforce that boundary for custom headers.
+        if (remoteMedia != null && remoteMedia.headers.isNotEmpty()) return exo()
         return when (type) {
             PlayerType.MPV -> try {
                 MpvPlayerController(context, userAgent, decode)

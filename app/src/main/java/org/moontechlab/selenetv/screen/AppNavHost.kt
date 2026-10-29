@@ -65,6 +65,8 @@ fun AppNavHost() {
         UpdateGate()
 
         // 全局自绘 Toast：渲染在所有页面/覆盖层之上，底部居中
+        org.moontechlab.selenetv.remote.RemotePlaybackHost()
+        org.moontechlab.selenetv.remote.RemotePairingHost()
         MoonToastHost(
             modifier = Modifier
                 .align(Alignment.BottomCenter)

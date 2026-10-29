@@ -45,6 +45,10 @@ class SeleneApplication : Application(), ImageLoaderFactory {
         
         // 启动遥控器 Web 服务器
         startRemoteControlServer()
+        thread {
+            runCatching { org.moontechlab.selenetv.remote.RemoteReceiver.start(this) }
+                .onFailure { Log.e("SeleneApplication", "Phone receiver unavailable", it) }
+        }
 
         // 本地模式启动后台刷新订阅：不阻塞 onCreate，失败仅 toast
         if (AppDataService.isLocalModeSync()) {

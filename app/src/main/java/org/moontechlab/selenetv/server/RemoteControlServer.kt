@@ -87,6 +87,9 @@ object RemoteControlServer {
             get("/") { call.respondRedirect("/remote_control") }
             get("/remote_control") { call.respondText(remoteControlHtml, ContentType.Text.Html) }
             post("/api/key") {
+                if (org.moontechlab.selenetv.remote.RemoteReceiver.blocksBrowserInput) {
+                    call.respond(HttpStatusCode.Forbidden); return@post
+                }
                 try {
                     val keyCode = call.receiveText().trim().toIntOrNull()
                     if (keyCode != null) {
@@ -101,6 +104,9 @@ object RemoteControlServer {
                 }
             }
             post("/api/text") {
+                if (org.moontechlab.selenetv.remote.RemoteReceiver.blocksBrowserInput) {
+                    call.respond(HttpStatusCode.Forbidden); return@post
+                }
                 try {
                     val text = call.receiveText().trim()
                     if (text.isNotEmpty()) {

@@ -36,6 +36,15 @@ object RemoteTextSink {
 private const val DESIGN_WIDTH_PX = 1080f
 
 class MainActivity : ComponentActivity() {
+    override fun onResume() {
+        super.onResume()
+        org.moontechlab.selenetv.remote.RemoteReceiver.setUiAvailable(true)
+    }
+
+    override fun onPause() {
+        org.moontechlab.selenetv.remote.RemoteReceiver.setUiAvailable(false)
+        super.onPause()
+    }
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val activityScope = CoroutineScope(Dispatchers.Main)
@@ -57,6 +66,7 @@ class MainActivity : ComponentActivity() {
         // 设置遥控器按键回调
         RemoteControlServer.setKeyEventCallback { keyCode ->
             mainHandler.post {
+                if (org.moontechlab.selenetv.remote.RemoteReceiver.blocksBrowserInput) return@post
                 if (keyCode == KeyEvent.KEYCODE_BACK) {
                     // 返回键使用 onBackPressedDispatcher
                     onBackPressedDispatcher.onBackPressed()
@@ -70,6 +80,7 @@ class MainActivity : ComponentActivity() {
         // 设置文本输入回调
         RemoteControlServer.setTextInputCallback { text ->
             mainHandler.post {
+                if (org.moontechlab.selenetv.remote.RemoteReceiver.blocksBrowserInput) return@post
                 // 独立窗口输入框（如设置输入弹框）注册了 sink → 优先写入；否则走主窗口焦点视图。
                 val sink = RemoteTextSink.sink
                 if (sink != null) {
