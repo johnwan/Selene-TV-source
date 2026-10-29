@@ -41,4 +41,14 @@ class RemoteSessionTest {
         assertEquals(42000L, r.media.startPositionMs)
         assertEquals(2, r.media.episodes.size)
     }
+    @Test fun televisionEpisodeChangePublishesIdentityAndRejectsOldMediaCommand() {
+        val s = RemoteSession("tv1")
+        val first = s.acceptPlay("phone1", request()).status
+        s.update(first.sessionId, "playing", 60000, 90000, episodeIndex = 1, title = "Episode 2")
+        val changed = s.snapshot()
+        assertEquals(1, changed.episodeIndex)
+        assertEquals("Episode 2", changed.title)
+        assertNotEquals(first.mediaId, changed.mediaId)
+        assertThrows(RemoteFailure::class.java) { s.acceptCommand("phone1", CommandRequest("c1", first.sessionId, first.mediaId, "pause")) }
+    }
 }

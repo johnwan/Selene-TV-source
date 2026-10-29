@@ -7,7 +7,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.UUID
 
-@Serializable data class TrustedPhone(val id: String, val name: String, val token: String)
+@Serializable data class TrustedPhone(val id: String, val name: String, val token: String, val recoveryHash: String = "")
 @Serializable data class PairResult(val pairId: String, val state: String, val expiresIn: Int = 60, val token: String? = null, val tvId: String? = null)
 data class PendingPair(val pairId: String, val clientId: String, val name: String, val secret: String, val expiresAt: Long, var state: String = "pending", var token: String? = null)
 
@@ -22,6 +22,9 @@ class RemoteTrustStore(private val read: () -> String, private val write: (Strin
     private fun persist() = write(Json.encodeToString(trusted.values.toList()))
     @Synchronized fun request(clientId: String, name: String, secret: String): PairResult {
         requireRemote(clientId.length in 1..128 && name.length in 1..64 && secret.length in 32..128)
+        trusted[clientId]?.takeIf { it.recoveryHash.isNotEmpty() && same(it.recoveryHash, hash(secret)) }?.let {
+            return PairResult(UUID.randomUUID().toString(), "allowed", token = it.token)
+        }
         expire()
         pending?.let { if (it.state == "pending") {
             requireRemote(it.clientId == clientId && same(it.secret, secret), "pairing_busy")
@@ -46,11 +49,14 @@ class RemoteTrustStore(private val read: () -> String, private val write: (Strin
         requireRemote(p.pairId == pairId && p.state == "pending", "pairing_expired")
         requireRemote(trusted.size < 32 || trusted.containsKey(p.clientId), "trusted_limit")
         val token = ByteArray(32).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
-        trusted[p.clientId] = TrustedPhone(p.clientId, p.name, token)
+        trusted[p.clientId] = TrustedPhone(p.clientId, p.name, token, hash(p.secret))
         persist(); p.token = token; p.state = "allowed"
     }
     @Synchronized fun decline(pairId: String) { pending?.takeIf { it.pairId == pairId && it.state == "pending" }?.state = "declined" }
     @Synchronized fun authenticate(token: String): TrustedPhone = trusted.values.firstOrNull { token.isNotEmpty() && same(it.token, token) } ?: throw RemoteFailure("unauthorized")
+    /** Serialize acceptance with revocation after the request body has arrived. */
+    @Synchronized fun <T> authorized(token: String, action: (TrustedPhone) -> T): T = action(authenticate(token))
     @Synchronized fun revoke(clientId: String) { trusted.remove(clientId); (completed.values + listOfNotNull(pending)).filter { it.clientId == clientId }.forEach { it.token = null; it.state = "declined" }; persist() }
     private fun same(a: String, b: String) = MessageDigest.isEqual(a.toByteArray(), b.toByteArray())
+    private fun hash(secret: String) = MessageDigest.getInstance("SHA-256").digest(secret.toByteArray()).joinToString("") { "%02x".format(it) }
 }

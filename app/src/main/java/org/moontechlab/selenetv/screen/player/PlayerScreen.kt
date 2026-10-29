@@ -98,7 +98,6 @@ fun PlayerScreen(launch: PlayerLaunch, onExit: () -> Unit, modifier: Modifier = 
     // Dialog 自身的 onBackPressedDispatcher，下方 root 直接拦截 BACK 手动驱动它（见 onPreviewKeyEvent 注释）。
     val backDispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val controller: VideoPlayer = remember { PlayerFactory.create(context, remoteMedia = remote?.request?.media) }
-    org.moontechlab.selenetv.remote.BindRemotePlayer(remote, controller, onExit)
     LaunchedEffect(controller) {
         if (remote == null) org.moontechlab.selenetv.remote.RemoteReceiver.playbackActive.collect { active ->
             if (active) { controller.pause(); onExit() }
@@ -121,6 +120,8 @@ fun PlayerScreen(launch: PlayerLaunch, onExit: () -> Unit, modifier: Modifier = 
 
     var controlsVisible by remember { mutableStateOf(true) }
     var currentEpisode by remember { mutableIntStateOf(launch.episodeIndex) }
+    org.moontechlab.selenetv.remote.BindRemotePlayer(remote, controller, onExit, currentEpisode,
+        if ((launch.selectedSource?.episodes?.size ?: 0) > 1) "${launch.title} — 第 ${currentEpisode + 1} 集" else launch.title)
     var currentSourceKey by remember { mutableStateOf(launch.selectedSourceKey) }
     var panelOpen by remember { mutableStateOf(false) }
     var panelTab by remember { mutableStateOf(PanelTab.Detail) }

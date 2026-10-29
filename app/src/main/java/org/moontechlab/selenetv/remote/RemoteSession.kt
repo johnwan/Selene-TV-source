@@ -23,7 +23,7 @@ class RemoteSession(tvId: String) {
         request.media.validate(); id(request.mediaId)
         duplicate(clientId, request.requestId, request)?.let { return it }
         requireRemote(status.ownerClientId.isEmpty() || status.ownerClientId == clientId || request.takeOver, "controller_busy")
-        status = RemoteStatus(status.tvId, clientId, UUID.randomUUID().toString(), request.mediaId, request.requestId, "loading", request.media.startPositionMs, rate = request.media.rate, capabilities = listOf("play", "pause", "stop", "rate") + if(request.media.kind == "vod") listOf("seek") else emptyList())
+        status = RemoteStatus(status.tvId, clientId, UUID.randomUUID().toString(), request.mediaId, request.requestId, "loading", request.media.startPositionMs, rate = request.media.rate, capabilities = listOf("play", "pause", "stop", "rate") + if(request.media.kind == "vod") listOf("seek") else emptyList(), episodeIndex = request.media.episodeIndex, title = request.media.title)
         return record(clientId, request.requestId, request)
     }
     @Synchronized fun acceptCommand(clientId: String, request: CommandRequest): Acceptance {
@@ -35,9 +35,10 @@ class RemoteSession(tvId: String) {
         if (request.action == "rate") requireRemote(request.rate != null && request.rate.isFinite() && request.rate in 0.5..2.0)
         return record(clientId, request.requestId, request)
     }
-    @Synchronized fun update(sessionId: String, state: String, positionMs: Long = 0, durationMs: Long = 0, rate: Double = 1.0, error: String? = null) {
+    @Synchronized fun update(sessionId: String, state: String, positionMs: Long = 0, durationMs: Long = 0, rate: Double = 1.0, error: String? = null, episodeIndex: Int? = null, title: String? = null) {
         if (status.sessionId != sessionId) return
-        status = status.copy(state = state, positionMs = positionMs.coerceAtLeast(0), durationMs = durationMs.coerceAtLeast(0), rate = rate, error = error)
+        val changed = episodeIndex != null && episodeIndex != status.episodeIndex
+        status = status.copy(state = state, positionMs = positionMs.coerceAtLeast(0), durationMs = durationMs.coerceAtLeast(0), rate = rate, error = error, episodeIndex = episodeIndex ?: status.episodeIndex, title = title ?: status.title, mediaId = if (changed) UUID.randomUUID().toString() else status.mediaId)
     }
     @Synchronized fun release(sessionId: String) {
         if (status.sessionId == sessionId) status = RemoteStatus(status.tvId)

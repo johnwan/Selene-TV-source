@@ -34,7 +34,6 @@ object RemoteReceiver {
     @Volatile private var uiAvailable = false
     @Volatile var onPlay: ((PlayRequest, RemoteStatus) -> Unit)? = null
     @Volatile var onCommand: ((CommandRequest) -> Unit)? = null
-    @Volatile var onRevoke: ((String) -> Unit)? = null
     private var engine: ApplicationEngine? = null
     private var discovery: RemoteDiscovery? = null
     private var trust: RemoteTrustStore? = null
@@ -58,7 +57,8 @@ object RemoteReceiver {
         val identity = RemoteTls.load(context)
         val environment = applicationEngineEnvironment {
             sslConnector(identity.store, RemoteTls.ALIAS, { identity.password.toCharArray() }, { identity.password.toCharArray() }) {
-                host = "0.0.0.0"; port = 0
+                // Android's dual-stack wildcard accepts IPv4 and IPv6 LAN peers.
+                host = "::"; port = 0
             }
             module { routes() }
         }
@@ -78,7 +78,6 @@ object RemoteReceiver {
     fun revoke(clientId: String) {
         trust?.revoke(clientId); phones.value = trust?.phones() ?: emptyList()
         synchronized(seen) { seen.remove(clientId) }
-        onRevoke?.invoke(clientId)
         refreshPair()
     }
     fun stop() { discovery?.close(); discovery = null; engine?.stop(500, 1000); engine = null }
@@ -90,10 +89,8 @@ object RemoteReceiver {
         return try { json.decodeFromString(bytes.toString(Charsets.UTF_8)) } catch (_: Exception) { throw RemoteFailure("invalid_request") }
     }
     private suspend inline fun <reified T> ApplicationCall.reply(value: T) = respondText(json.encodeToString(value), ContentType.Application.Json)
-    private fun ApplicationCall.phone(): TrustedPhone {
-        val token = request.header(HttpHeaders.Authorization)?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ") ?: ""
-        return trust?.authenticate(token) ?: throw RemoteFailure("unauthorized")
-    }
+    private fun ApplicationCall.authToken(): String = request.header(HttpHeaders.Authorization)?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ") ?: ""
+    private fun ApplicationCall.phone(): TrustedPhone = trust?.authenticate(authToken()) ?: throw RemoteFailure("unauthorized")
     private suspend fun ApplicationCall.guarded(action: suspend () -> Unit) {
         try { action() } catch (e: RemoteFailure) {
             respondText(json.encodeToString(ReceiverError(e.code)), ContentType.Application.Json, if (e.code == "unauthorized") HttpStatusCode.Unauthorized else HttpStatusCode.BadRequest)
@@ -107,7 +104,7 @@ object RemoteReceiver {
                     requireRemote(uiAvailable, "tv_not_ready")
                     val p = call.body<PairRequest>()
                     val result = trust!!.request(p.clientId, p.name, p.requestSecret)
-                    refreshPair(); call.reply(result)
+                    refreshPair(); call.reply(result.copy(tvId = receiverId))
                 } }
                 post("/pair/result") { call.guarded {
                     val p = call.body<PairPoll>()
@@ -128,20 +125,22 @@ object RemoteReceiver {
                     call.reply(session.snapshot())
                 } }
                 post("/play") { call.guarded {
-                    val phone = call.phone(); val request = call.body<PlayRequest>()
+                    call.phone(); val token = call.authToken(); val request = call.body<PlayRequest>()
                     requireRemote(uiAvailable && onPlay != null, "tv_not_ready")
                     val acceptance = withContext(Dispatchers.Main) {
-                        session.acceptPlay(phone.id, request).also { if (it.isNew) onPlay?.invoke(request, it.status) }
+                        requireRemote(uiAvailable && onPlay != null, "tv_not_ready")
+                        trust!!.authorized(token) { phone -> session.acceptPlay(phone.id, request).also { if (it.isNew) onPlay?.invoke(request, it.status) } }
                     }
                     call.reply(acceptance.status)
                 } }
                 post("/command") { call.guarded {
-                    val phone = call.phone(); val request = call.body<CommandRequest>()
+                    call.phone(); val token = call.authToken(); val request = call.body<CommandRequest>()
                     requireRemote(uiAvailable && onCommand != null, "tv_not_ready")
                     val acceptance = withContext(Dispatchers.Main) {
-                        session.acceptCommand(phone.id, request).also { if (it.isNew) onCommand?.invoke(request) }
+                        requireRemote(uiAvailable && onCommand != null, "tv_not_ready")
+                        trust!!.authorized(token) { phone -> session.acceptCommand(phone.id, request).also { if (it.isNew) onCommand?.invoke(request) } }
                     }
-                    call.reply(acceptance.status)
+                    call.reply(if (acceptance.isNew) session.snapshot() else acceptance.status)
                 } }
             }
         }

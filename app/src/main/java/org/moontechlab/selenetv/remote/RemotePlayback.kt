@@ -26,7 +26,7 @@ interface RemotePlayerPort {
 }
 
 class RemotePlaybackBinding(private val session: RemoteSession, private val sessionId: String, private val player: RemotePlayerPort, private val stop: () -> Unit) {
-    fun refresh() {
+    fun refresh(episodeIndex: Int? = null, title: String? = null) {
         val state = when {
             player.error != null -> "failed"
             player.buffering || !player.started -> "loading"
@@ -34,7 +34,7 @@ class RemotePlaybackBinding(private val session: RemoteSession, private val sess
             player.duration > 0 && player.position >= player.duration -> "ended"
             else -> "paused"
         }
-        session.update(sessionId, state, player.position, player.duration, player.rate, if (player.error != null) "media_unavailable" else null)
+        session.update(sessionId, state, player.position, player.duration, player.rate, if (player.error != null) "media_unavailable" else null, episodeIndex, title)
     }
     fun command(request: CommandRequest) {
         requireRemote(session.snapshot().sessionId == sessionId && request.sessionId == sessionId, "stale_session")

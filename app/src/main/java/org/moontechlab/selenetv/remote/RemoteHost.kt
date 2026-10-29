@@ -37,9 +37,11 @@ data class RemoteLaunch(val request: PlayRequest, val status: RemoteStatus)
     }
 }
 
-@Composable fun BindRemotePlayer(remote: RemoteLaunch?, player: VideoPlayer, onStop: () -> Unit) {
+@Composable fun BindRemotePlayer(remote: RemoteLaunch?, player: VideoPlayer, onStop: () -> Unit, episodeIndex: Int = 0, title: String? = null) {
     if (remote == null) return
     val stop by rememberUpdatedState(onStop)
+    val activeEpisode by rememberUpdatedState(episodeIndex)
+    val activeTitle by rememberUpdatedState(title)
     val binding = remember(remote.status.sessionId, player) {
         RemotePlaybackBinding(RemoteReceiver.session, remote.status.sessionId, object : RemotePlayerPort {
             override val playing get() = player.isPlaying
@@ -62,5 +64,5 @@ data class RemoteLaunch(val request: PlayRequest, val status: RemoteStatus)
             binding.close()
         }
     }
-    LaunchedEffect(binding) { while (true) { player.syncProgress(); binding.refresh(); delay(500) } }
+    LaunchedEffect(binding) { while (true) { player.syncProgress(); binding.refresh(activeEpisode, activeTitle); delay(500) } }
 }
