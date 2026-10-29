@@ -6,6 +6,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.tv.material3.Button
 
 @Composable fun TrustedPhonesPanel() {
@@ -19,6 +21,7 @@ import androidx.tv.material3.Button
         }
         AlertDialog(onDismissRequest = { open = false }, title = { Text("已信任的手机") }, text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("手动连接：电视 IP:${RemoteReceiver.controlPort}")
                 if (phones.isEmpty()) Text("尚未连接手机")
                 phones.forEach { phone -> Button(onClick = { RemoteReceiver.revoke(phone.id) }) { Text("移除 ${phone.name}") } }
             }
@@ -31,9 +34,11 @@ import androidx.tv.material3.Button
     LaunchedEffect(Unit) { while (true) { RemoteReceiver.refreshPair(); kotlinx.coroutines.delay(1000) } }
     LaunchedEffect(Unit) { RemoteReceiver.messages.collect { org.moontechlab.selenetv.ui.MoonToast.show(it) } }
     pending?.let { p ->
+        val allowFocus = remember(p.pairId) { FocusRequester() }
+        LaunchedEffect(p.pairId) { allowFocus.requestFocus() }
         AlertDialog(onDismissRequest = { RemoteReceiver.decline(p.pairId) }, title = { Text("手机连接请求") },
             text = { Text("${p.name} 想连接此电视。允许后，该手机可以选择视频和控制播放。以后连接无需再次确认。") },
-            confirmButton = { Button(onClick = { RemoteReceiver.approve(p.pairId) }) { Text("允许") } },
+            confirmButton = { Button(onClick = { RemoteReceiver.approve(p.pairId) }, modifier = Modifier.focusRequester(allowFocus)) { Text("允许") } },
             dismissButton = { Button(onClick = { RemoteReceiver.decline(p.pairId) }) { Text("拒绝") } })
     }
 }

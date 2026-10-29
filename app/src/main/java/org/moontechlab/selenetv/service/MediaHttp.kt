@@ -38,14 +38,7 @@ object MediaHttp {
 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun remoteDataSourceFactory(url: String, headers: Map<String, String>): DataSource.Factory {
-        val origin = okhttp3.HttpUrl.Companion.run { url.toHttpUrl() }
-        val scoped = client.newBuilder().addNetworkInterceptor { chain ->
-            val request = chain.request()
-            val sameOrigin = request.url.scheme == origin.scheme && request.url.host == origin.host && request.url.port == origin.port
-            val builder = request.newBuilder()
-            if (!sameOrigin) { builder.removeHeader("Cookie"); builder.removeHeader("Authorization") }
-            chain.proceed(builder.build())
-        }.build()
+        val scoped = org.moontechlab.selenetv.remote.remoteMediaHttpClient(client, url, headers)
         return OkHttpDataSource.Factory(scoped).setDefaultRequestProperties(headers)
     }
 

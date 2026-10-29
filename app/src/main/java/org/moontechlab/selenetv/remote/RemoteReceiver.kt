@@ -39,6 +39,7 @@ object RemoteReceiver {
     private var discovery: RemoteDiscovery? = null
     private var trust: RemoteTrustStore? = null
     private var receiverId = ""
+    var controlPort = 0; private set
     lateinit var session: RemoteSession; private set
     private val seen = mutableMapOf<String, Long>()
     val blocksBrowserInput: Boolean get() = trustUiOpen || pending.value != null
@@ -64,6 +65,7 @@ object RemoteReceiver {
         val server = embeddedServer(Netty, environment).start(wait = false)
         engine = server
         val port = runBlocking { server.resolvedConnectors().first().port }
+        controlPort = port
         discovery = RemoteDiscovery(context).also { it.register(receiverId, "Selene-TV ${Build.MODEL}".take(60), port) }
     }
     fun setUiAvailable(value: Boolean) {

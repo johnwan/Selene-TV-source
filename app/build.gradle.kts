@@ -87,7 +87,9 @@ android {
 
             // 明确指定要分离的架构
             // 注意：armv8 对应 "arm64-v8a"，armv7a 对应 "armeabi-v7a"
-            include("arm64-v8a", "armeabi-v7a")
+            val emulatorAbi = providers.gradleProperty("seleneEmulatorAbi").orNull
+            if (emulatorAbi != null && gradle.startParameter.taskNames.none { it.contains("Release", ignoreCase = true) }) include(emulatorAbi)
+            else include("arm64-v8a", "armeabi-v7a")
 
             // 是否还需要生成一个包含所有架构的通用包 (Fat APK)？
             // 如果你只想要两个独立的包，设为 false。
@@ -134,6 +136,7 @@ dependencies {
     // QRCode
     implementation("io.github.g0dkar:qrcode-kotlin:4.2.0")
     testImplementation(libs.junit)
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

@@ -36,4 +36,11 @@ class RemoteTrustTest {
         assertThrows(RemoteFailure::class.java) { s.authenticate("phone1") }
         assertThrows(RemoteFailure::class.java) { s.authenticate("") }
     }
+    @Test fun anotherPairRequestCannotStealAnApprovedResult() {
+        val s = store()
+        val first = s.request("phone1", "Phone1", "s".repeat(32)); s.approve(first.pairId)
+        s.request("phone2", "Phone2", "t".repeat(32))
+        assertEquals("allowed", s.result(first.pairId, "s".repeat(32)).state)
+        assertNotNull(s.result(first.pairId, "s".repeat(32)).token)
+    }
 }

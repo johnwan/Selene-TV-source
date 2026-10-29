@@ -14,10 +14,11 @@ data class PendingPair(val pairId: String, val clientId: String, val name: Strin
 class RemoteTrustStore(private val read: () -> String, private val write: (String) -> Unit, private val now: () -> Long = System::currentTimeMillis) {
     private val trusted = (read().takeIf { it.isNotEmpty() }?.let { Json.decodeFromString<List<TrustedPhone>>(it) } ?: emptyList()).associateBy { it.id }.toMutableMap()
     private var pending: PendingPair? = null
+    private val completed = LinkedHashMap<String, PendingPair>()
     private val attempts = ArrayDeque<Long>()
     @Synchronized fun phones(): List<TrustedPhone> = trusted.values.toList()
     @Synchronized fun current(): PendingPair? { expire(); return pending?.takeIf { it.state == "pending" } }
-    private fun expire() { pending?.let { if (now() >= it.expiresAt) { it.state = "expired"; it.token = null } } }
+    private fun expire() { (completed.values + listOfNotNull(pending)).forEach { if (now() >= it.expiresAt) { it.state = "expired"; it.token = null } } }
     private fun persist() = write(Json.encodeToString(trusted.values.toList()))
     @Synchronized fun request(clientId: String, name: String, secret: String): PairResult {
         requireRemote(clientId.length in 1..128 && name.length in 1..64 && secret.length in 32..128)
@@ -29,12 +30,14 @@ class RemoteTrustStore(private val read: () -> String, private val write: (Strin
         while (attempts.isNotEmpty() && now() - attempts.first() >= 60000) attempts.removeFirst()
         requireRemote(attempts.size < 3, "rate_limited")
         attempts.addLast(now())
+        pending?.let { completed[it.pairId] = it }
+        if (completed.size > 16) completed.remove(completed.keys.first())
         val p = PendingPair(UUID.randomUUID().toString(), clientId, name.filter { !it.isISOControl() }.take(64), secret, now() + 60000)
         pending = p
         return PairResult(p.pairId, "pending")
     }
     @Synchronized fun result(pairId: String, secret: String): PairResult {
-        expire(); val p = pending ?: throw RemoteFailure("pairing_expired")
+        expire(); val p = pending?.takeIf { it.pairId == pairId } ?: completed[pairId] ?: throw RemoteFailure("pairing_expired")
         requireRemote(p.pairId == pairId && same(p.secret, secret), "pairing_expired")
         return PairResult(pairId, p.state, token = p.token)
     }
@@ -48,6 +51,6 @@ class RemoteTrustStore(private val read: () -> String, private val write: (Strin
     }
     @Synchronized fun decline(pairId: String) { pending?.takeIf { it.pairId == pairId && it.state == "pending" }?.state = "declined" }
     @Synchronized fun authenticate(token: String): TrustedPhone = trusted.values.firstOrNull { token.isNotEmpty() && same(it.token, token) } ?: throw RemoteFailure("unauthorized")
-    @Synchronized fun revoke(clientId: String) { trusted.remove(clientId); pending?.takeIf { it.clientId == clientId }?.let { it.token = null; it.state = "declined" }; persist() }
+    @Synchronized fun revoke(clientId: String) { trusted.remove(clientId); (completed.values + listOfNotNull(pending)).filter { it.clientId == clientId }.forEach { it.token = null; it.state = "declined" }; persist() }
     private fun same(a: String, b: String) = MessageDigest.isEqual(a.toByteArray(), b.toByteArray())
 }

@@ -1,5 +1,24 @@
 package org.moontechlab.selenetv.remote
 
+import okhttp3.OkHttpClient
+import okhttp3.HttpUrl.Companion.toHttpUrl
+
+/** Shared by initial media, HLS playlists/segments and every redirect hop. */
+fun remoteMediaHttpClient(base: OkHttpClient, url: String, headers: Map<String, String>): OkHttpClient {
+    val origin = url.toHttpUrl()
+    return base.newBuilder().addNetworkInterceptor { chain ->
+        val request = chain.request()
+        val sameOrigin = request.url.scheme == origin.scheme && request.url.host == origin.host && request.url.port == origin.port
+        val builder = request.newBuilder()
+        headers.forEach { (name, value) ->
+            if (!sameOrigin && (name.equals("Cookie", true) || name.equals("Authorization", true))) builder.removeHeader(name)
+            else builder.header(name, value)
+        }
+        if (!sameOrigin) { builder.removeHeader("Cookie"); builder.removeHeader("Authorization") }
+        chain.proceed(builder.build())
+    }.build()
+}
+
 interface RemotePlayerPort {
     val playing: Boolean; val buffering: Boolean; val started: Boolean
     val position: Long; val duration: Long; var rate: Double; val error: String?
