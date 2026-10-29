@@ -44,6 +44,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -68,6 +69,7 @@ private val LiveGreen = Color(0xFF4CAF50)
 @Composable
 fun LivePlayerScreen(launch: LiveLaunch, onExit: () -> Unit, modifier: Modifier = Modifier, remote: org.moontechlab.selenetv.remote.RemoteLaunch? = null) {
     val context = LocalContext.current
+    val backDispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val controller: VideoPlayer = remember { PlayerFactory.create(context, launch.source.ua, remote?.request?.media) }
     org.moontechlab.selenetv.remote.BindRemotePlayer(remote, controller, onExit)
     LaunchedEffect(controller) {
@@ -214,6 +216,15 @@ fun LivePlayerScreen(launch: LiveLaunch, onExit: () -> Unit, modifier: Modifier 
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
+            // Remote playback lives in a Dialog, whose Back events do not pass
+            // through MainActivity. Match the movie player's single dispatch.
+            .onPreviewKeyEvent { e ->
+                if (e.key != Key.Back) return@onPreviewKeyEvent false
+                if (e.type == KeyEventType.KeyUp && !e.nativeKeyEvent.isCanceled) {
+                    backDispatcher?.onBackPressed()
+                }
+                true
+            }
             .focusGroup()
             // 焦点陷阱：禁止任何方向把焦点带出播放页覆盖层、穿透到下层直播 Tab
             .focusProperties { exit = { FocusRequester.Cancel } },

@@ -1,8 +1,10 @@
 package org.moontechlab.selenetv.remote
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import org.moontechlab.selenetv.model.*
 import org.moontechlab.selenetv.screen.detail.sourceKey
 import org.moontechlab.selenetv.screen.player.*
@@ -21,6 +23,17 @@ data class RemoteLaunch(val request: PlayRequest, val status: RemoteStatus)
         key(current.status.sessionId) {
             fun exit() { RemoteReceiver.session.release(current.status.sessionId); launch = null; RemoteReceiver.playbackActive.value = false }
             Dialog(onDismissRequest = { exit() }, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false)) {
+                // Compose disables the default width but still measures Dialog
+                // height as content on physical TVs. Fill both dimensions for
+                // movie and live playback, as the standalone movie host does.
+                val playerView = LocalView.current
+                DisposableEffect(playerView) {
+                    (playerView.parent as? DialogWindowProvider)?.window?.setLayout(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    )
+                    onDispose {}
+                }
                 val m = current.request.media
                 if (m.kind == "live") {
                     val channel = LiveChannel(id = m.liveChannelId.ifEmpty { current.request.mediaId }, name = m.title, url = m.url)

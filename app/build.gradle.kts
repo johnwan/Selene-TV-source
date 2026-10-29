@@ -44,6 +44,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Optional isolated install for physical-device QA; normal builds
+            // retain the public package and the installed app's private data.
+            applicationIdSuffix = providers.gradleProperty("seleneTestApplicationIdSuffix").orNull
+            if (applicationIdSuffix != null) resValue("string", "app_name", "Selene-TV Device Test")
+        }
         release {
             // 有 key.properties 时用稳定 release 签名；否则回退 debug 以便本地构建
             signingConfig = if (hasReleaseSigning) {
