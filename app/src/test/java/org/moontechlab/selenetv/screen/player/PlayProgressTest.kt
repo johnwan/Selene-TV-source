@@ -8,6 +8,15 @@ import org.moontechlab.selenetv.model.SearchResult
 
 class PlayProgressTest {
 
+    @Test fun preservesExistingCoverWhenNewPlaybackHasNoPoster() {
+        val previous = PlayProgress.buildRecord(source(), "Movie", 0, 5000, 60000)
+        val incoming = PlayProgress.buildRecord(source().copy(poster = ""), "Movie", 1, 12000, 60000)
+        val merged = PlayProgress.preserveExistingCover(incoming, previous)
+        assertEquals(previous.cover, merged.cover)
+        assertEquals(2, merged.index)
+        assertEquals(12L, merged.playTime)
+    }
+
     private fun source() = SearchResult(
         id = "42",
         title = "示例剧",

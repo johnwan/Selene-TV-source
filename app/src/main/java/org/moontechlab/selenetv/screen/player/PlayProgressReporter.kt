@@ -32,7 +32,11 @@ class PlayProgressReporter {
         val record = PlayProgress.buildRecord(source, title, episodeIndex, positionMs, durationMs, now)
         scope.launch {
             try {
-                Repositories.userData().savePlayRecord(record)
+                val repository = Repositories.userData()
+                // Do not replace an existing poster with an empty value. If
+                // reading fails, skip this write instead of erasing metadata.
+                val existing = if (record.cover.isBlank()) repository.getPlayRecords()["${record.source}+${record.id}"] else null
+                repository.savePlayRecord(PlayProgress.preserveExistingCover(record, existing))
             } catch (_: Exception) {
                 // 进度保存失败不打断播放
             }

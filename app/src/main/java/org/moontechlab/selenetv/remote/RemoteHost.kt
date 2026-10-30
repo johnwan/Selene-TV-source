@@ -42,7 +42,7 @@ data class RemoteLaunch(val request: PlayRequest, val status: RemoteStatus)
                 } else {
                     val episodes = m.episodes.ifEmpty { listOf(RemoteEpisode(m.title, m.url)) }.toMutableList()
                     if (m.episodeIndex in episodes.indices) episodes[m.episodeIndex] = episodes[m.episodeIndex].copy(url = m.url)
-                    val source = SearchResult(id = m.videoId.ifEmpty { current.request.mediaId }, title = m.title, source = m.sourceId.ifEmpty { "remote" }, sourceName = "手机选择", episodes = episodes.map { it.url }, episodesTitles = episodes.map { it.title })
+                    val source = SearchResult(id = m.videoId.ifEmpty { current.request.mediaId }, title = m.title, poster = m.safeCoverUrl(), source = m.sourceId.ifEmpty { "remote" }, sourceName = "手机选择", episodes = episodes.map { it.url }, episodesTitles = episodes.map { it.title })
                     PlayerScreen(PlayerLaunch(m.title, null, listOf(source), sourceKey(source), m.episodeIndex, m.startPositionMs), onExit = { exit() }, remote = current)
                 }
             }

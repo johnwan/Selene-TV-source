@@ -10,6 +10,11 @@ import java.net.URLEncoder
  */
 object PlayProgress {
 
+    fun preserveExistingCover(incoming: PlayRecord, existing: PlayRecord?): PlayRecord =
+        if (incoming.cover.isBlank() && existing != null && existing.source == incoming.source && existing.id == incoming.id)
+            incoming.copy(cover = existing.cover)
+        else incoming
+
     /** m3u8 代理拼接：代理为空返回原 URL，否则 URL-encode 后加前缀。 */
     fun buildPlayUrl(rawUrl: String, proxyUrl: String): String {
         if (proxyUrl.isBlank()) return rawUrl

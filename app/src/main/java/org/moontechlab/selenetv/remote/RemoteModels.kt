@@ -11,8 +11,13 @@ fun requireRemote(condition: Boolean, code: String = "invalid_request") { if (!c
     val kind: String = "vod", val title: String, val url: String,
     val headers: Map<String, String> = emptyMap(), val sourceId: String = "", val videoId: String = "",
     val episodes: List<RemoteEpisode> = emptyList(), val episodeIndex: Int = 0,
-    val startPositionMs: Long = 0, val rate: Double = 1.0, val liveChannelId: String = "",
+    val startPositionMs: Long = 0, val rate: Double = 1.0, val liveChannelId: String = "", val coverUrl: String = "",
 ) {
+    fun safeCoverUrl(): String {
+        if (coverUrl.isEmpty() || coverUrl.length > 8192) return ""
+        val uri = runCatching { URI(coverUrl) }.getOrNull() ?: return ""
+        return if (uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank() && uri.userInfo == null) coverUrl else ""
+    }
     fun validate() {
         requireRemote(kind in listOf("vod", "live") && title.isNotBlank() && title.length <= 512)
         validateMediaUrl(url)

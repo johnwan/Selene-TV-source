@@ -31,6 +31,8 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import kotlinx.coroutines.delay
 import org.moontechlab.selenetv.util.getImageUrlSync
+import org.moontechlab.selenetv.util.imageProxyFallback
+import org.moontechlab.selenetv.service.AppDataService
 
 /**
  * 封面缺失 / 加载失败时的兜底占位:自适应填满父级,衬在卡片现有深色背景上居中显示一个手绘
@@ -97,21 +99,27 @@ fun CoverImage(
         NoCoverPlaceholder(modifier)
         return
     }
-    var state by remember(url) { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Empty) }
-    var timedOut by remember(url) { mutableStateOf(false) }
-    LaunchedEffect(url) {
+    val fallback = remember(url) { if (AppDataService.isLocalModeSync()) null else imageProxyFallback(url, AppDataService.getServerUrlSync()) }
+    var attemptUrl by remember(url) { mutableStateOf(url) }
+    var state by remember(attemptUrl) { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Empty) }
+    var timedOut by remember(attemptUrl) { mutableStateOf(false) }
+    LaunchedEffect(attemptUrl) {
         delay(timeoutMs)
-        timedOut = true
+        if (state !is AsyncImagePainter.State.Success && fallback != null && attemptUrl != fallback) attemptUrl = fallback
+        else timedOut = true
     }
     val isSuccess = state is AsyncImagePainter.State.Success
     val failed = state is AsyncImagePainter.State.Error || (timedOut && !isSuccess)
     Box(modifier) {
         AsyncImage(
-            model = url,
+            model = attemptUrl,
             contentDescription = contentDescription,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            onState = { state = it },
+            onState = {
+                state = it
+                if (it is AsyncImagePainter.State.Error && fallback != null && attemptUrl != fallback) attemptUrl = fallback
+            },
         )
         if (failed) NoCoverPlaceholder(Modifier.fillMaxSize())
     }

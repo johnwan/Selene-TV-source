@@ -2,6 +2,7 @@ package org.moontechlab.selenetv.util
 
 import org.moontechlab.selenetv.service.AppDataService
 import java.net.URLEncoder
+import java.net.URI
 
 /** 预编译正则，避免每次调用重复创建 */
 private val DOUBAN_IMAGE_REGEX = Regex("""img\d+\.doubanio\.com""")
@@ -19,6 +20,17 @@ private fun serverProxyOrNull(originalUrl: String): String? {
         ?: return null
     val encoded = URLEncoder.encode(originalUrl, "UTF-8")
     return "$server/api/image-proxy?url=$encoded"
+}
+
+/** One bounded fallback for external images; avoid proxy recursion and local addresses. */
+fun imageProxyFallback(originalUrl: String, serverUrl: String?): String? {
+    val source = runCatching { URI(originalUrl) }.getOrNull() ?: return null
+    val serverAddress = serverUrl ?: return null
+    val server = runCatching { URI(serverAddress) }.getOrNull() ?: return null
+    val host = source.host?.lowercase()?.removeSurrounding("[", "]") ?: return null
+    if (source.scheme !in listOf("http", "https") || source.userInfo != null || server.scheme !in listOf("http", "https") || server.host.isNullOrEmpty()) return null
+    if (host == server.host.lowercase() || !host.contains('.') || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".home.arpa") || host.contains(':') || host.all { it.isDigit() || it == '.' }) return null
+    return "${serverAddress.trimEnd('/')}/api/image-proxy?url=${URLEncoder.encode(originalUrl, "UTF-8")}"
 }
 
 /**

@@ -21,7 +21,7 @@ import java.util.UUID
 
 @Serializable data class PairRequest(val clientId: String, val name: String, val requestSecret: String)
 @Serializable data class PairPoll(val pairId: String, val requestSecret: String)
-@Serializable data class ReceiverInfo(val version: Int = 1, val tvId: String, val name: String, val capabilities: List<String> = listOf("vod", "live", "control"))
+@Serializable data class ReceiverInfo(val version: Int = 1, val tvId: String, val name: String, val capabilities: List<String> = listOf("vod", "live", "control", "coverMetadata"))
 @Serializable data class ReceiverError(val code: String, val message: String = code)
 
 object RemoteReceiver {
