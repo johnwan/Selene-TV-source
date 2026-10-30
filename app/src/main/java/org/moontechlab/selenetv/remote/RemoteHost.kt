@@ -21,7 +21,7 @@ data class RemoteLaunch(val request: PlayRequest, val status: RemoteStatus)
     }
     launch?.let { current ->
         key(current.status.sessionId) {
-            fun exit() { RemoteReceiver.session.release(current.status.sessionId); launch = null; RemoteReceiver.playbackActive.value = false }
+            fun exit() { RemoteReceiver.session.release(current.status.sessionId); launch = null; RemoteReceiver.playbackActive.value = false; RemoteReceiver.historyChanged.tryEmit(Unit) }
             Dialog(onDismissRequest = { exit() }, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false)) {
                 // Compose disables the default width but still measures Dialog
                 // height as content on physical TVs. Fill both dimensions for

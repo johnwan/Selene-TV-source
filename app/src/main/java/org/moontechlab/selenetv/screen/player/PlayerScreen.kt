@@ -103,7 +103,10 @@ fun PlayerScreen(launch: PlayerLaunch, onExit: () -> Unit, modifier: Modifier = 
             if (active) { controller.pause(); onExit() }
         }
     }
-    val reporter = remember { PlayProgressReporter() }
+    val reporter = remember { PlayProgressReporter {
+        if (remote != null && !org.moontechlab.selenetv.remote.RemoteReceiver.playbackActive.value)
+            org.moontechlab.selenetv.remote.RemoteReceiver.historyChanged.tryEmit(Unit)
+    } }
 
     // 播放页处于独立 Dialog 窗口（见 DetailScreen 用 Dialog 隔离焦点域）。Compose Dialog 在
     // usePlatformDefaultWidth=false 下只把窗口宽度设为 MATCH_PARENT，高度仍按内容测量——真机上该高度会
@@ -120,8 +123,6 @@ fun PlayerScreen(launch: PlayerLaunch, onExit: () -> Unit, modifier: Modifier = 
 
     var controlsVisible by remember { mutableStateOf(true) }
     var currentEpisode by remember { mutableIntStateOf(launch.episodeIndex) }
-    org.moontechlab.selenetv.remote.BindRemotePlayer(remote, controller, onExit, currentEpisode,
-        if ((launch.selectedSource?.episodes?.size ?: 0) > 1) "${launch.title} — 第 ${currentEpisode + 1} 集" else launch.title)
     var currentSourceKey by remember { mutableStateOf(launch.selectedSourceKey) }
     var panelOpen by remember { mutableStateOf(false) }
     var panelTab by remember { mutableStateOf(PanelTab.Detail) }
@@ -212,6 +213,12 @@ fun PlayerScreen(launch: PlayerLaunch, onExit: () -> Unit, modifier: Modifier = 
         val dur = if (controller.durationMs > 0) controller.durationMs else launch.durationMs
         src?.let { reporter.save(it, launch.title, currentEpisode, controller.positionMs, dur, force = force) }
     }
+
+    org.moontechlab.selenetv.remote.BindRemotePlayer(remote, controller, {
+        saveProgress(force = true)
+        onExit()
+    }, currentEpisode,
+        if ((launch.selectedSource?.episodes?.size ?: 0) > 1) "${launch.title} — 第 ${currentEpisode + 1} 集" else launch.title)
 
     fun togglePlay() {
         // 即将从「播放」切到「暂停」时强制保存一次（spec：暂停为保存时机）

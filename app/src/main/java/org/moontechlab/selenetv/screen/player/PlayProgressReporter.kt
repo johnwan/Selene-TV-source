@@ -11,7 +11,7 @@ import org.moontechlab.selenetv.model.SearchResult
  * 播放记录上报：内置节流（见 [PlayProgress.shouldSave]）。
  * 用独立 IO scope 发起 fire-and-forget 保存，使退出/切换时的保存不被 composition 取消打断。
  */
-class PlayProgressReporter {
+class PlayProgressReporter(private val onSaved: () -> Unit = {}) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var lastSavedPositionMs = -1L
@@ -37,6 +37,7 @@ class PlayProgressReporter {
                 // reading fails, skip this write instead of erasing metadata.
                 val existing = if (record.cover.isBlank()) repository.getPlayRecords()["${record.source}+${record.id}"] else null
                 repository.savePlayRecord(PlayProgress.preserveExistingCover(record, existing))
+                onSaved()
             } catch (_: Exception) {
                 // 进度保存失败不打断播放
             }

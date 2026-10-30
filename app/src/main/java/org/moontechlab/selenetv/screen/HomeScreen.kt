@@ -42,6 +42,9 @@ fun HomeScreen(navController: androidx.navigation.NavController) {
     var selectedTabId by remember { mutableStateOf("home") }
 
     var homeRefreshKey by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        org.moontechlab.selenetv.remote.RemoteReceiver.historyChanged.collect { homeRefreshKey++ }
+    }
 
     // 详情页作为覆盖层渲染（而非导航目的地），首页组合保持存活 → 数据与焦点不丢失。
     var detailEntry by remember { mutableStateOf<DetailEntry?>(null) }

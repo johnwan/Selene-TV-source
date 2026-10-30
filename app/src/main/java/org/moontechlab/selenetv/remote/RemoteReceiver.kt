@@ -30,6 +30,7 @@ object RemoteReceiver {
     val phones = MutableStateFlow<List<TrustedPhone>>(emptyList())
     val messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val playbackActive = MutableStateFlow(false)
+    val historyChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
     @Volatile var trustUiOpen = false
     @Volatile private var uiAvailable = false
     @Volatile var onPlay: ((PlayRequest, RemoteStatus) -> Unit)? = null

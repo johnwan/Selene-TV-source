@@ -172,8 +172,10 @@ fun HomeTab(
         confirmVisible = true
     }
 
+    var historyLoadGeneration by remember { mutableIntStateOf(0) }
     // 加载播放历史 + 收藏夹（收藏夹依赖播放历史的 index）
     fun loadPlayRecordsAndFavorites() {
+        val generation = ++historyLoadGeneration
         // 未登录：不请求（会抛「未登录」异常），直接清空并置为非加载态，区块由 isLoggedIn 隐藏
         if (!(AppDataService.isLoggedInSync() || AppDataService.isLocalModeSync())) {
             playRecords = emptyList()
@@ -196,6 +198,9 @@ fun HomeTab(
                 val records = withContext(Dispatchers.IO) {
                     Repositories.userData().getPlayRecords()
                 }
+                // A final remote progress save can trigger another refresh
+                // while this request is in flight. Never restore its stale data.
+                if (generation != historyLoadGeneration) return@launch
                 playRecordsMap = records
                 val newRecords = records.values
                     .sortedByDescending { it.saveTime }
@@ -205,6 +210,7 @@ fun HomeTab(
                 if (newRecords != playRecords) playRecords = newRecords
                 errorPlayRecords = null
             } catch (e: Exception) {
+                if (generation != historyLoadGeneration) return@launch
                 errorPlayRecords = e.message ?: "加载失败"
                 android.util.Log.e("HomeTab", "加载播放历史失败: ${e.message}")
             }
@@ -214,6 +220,7 @@ fun HomeTab(
                 val favList = withContext(Dispatchers.IO) {
                     Repositories.userData().getFavorites()
                 }
+                if (generation != historyLoadGeneration) return@launch
                 val newFavs = favList.map { fav ->
                     val key = "${fav.source}+${fav.id}"
                     val matchedRecord = playRecordsMap[key]
@@ -228,6 +235,7 @@ fun HomeTab(
                 if (newFavs != favorites) favorites = newFavs
                 errorFavorites = null
             } catch (e: Exception) {
+                if (generation != historyLoadGeneration) return@launch
                 errorFavorites = e.message ?: "加载失败"
                 android.util.Log.e("HomeTab", "加载收藏夹失败: ${e.message}")
             }
